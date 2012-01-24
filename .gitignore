@@ -4,3 +4,4 @@ crop/
 *.jpg
 *.zip
 smiles.html
+.DS_Store
