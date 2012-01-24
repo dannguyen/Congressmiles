@@ -225,7 +225,7 @@ html_file.close
 #   Sunlight Labs: http://services.sunlightlabs.com/docs/Sunlight_Congress_API/
 #   NYT Congress API: http://developer.nytimes.com/docs/congress_api/
 #   Face API: http://developers.face.com/
-# 
+#    http://developers.face.com/docs/api/faces-detect/
 # More programming help at:
 # http://ruby.bastardsbook.com/chapters/image-manipulation/
 # http://studio.imagemagick.org/RMagick/doc/

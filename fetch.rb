@@ -76,6 +76,7 @@ senate_json = Crack::JSON.parse(File.open(nyt_congress_json_name, 'r').read)
 ## More information can be found at:
  
 # http://developers.face.com/
+# http://developers.face.com/docs/api/faces-detect/
 # http://ruby.bastardsbook.com/chapters/image-manipulation/
 
 face_api_key, face_api_secret = KEYS['face'].split(',')
@@ -129,7 +130,7 @@ end
 #   Sunlight Labs: http://services.sunlightlabs.com/docs/Sunlight_Congress_API/
 #   NYT Congress API: http://developer.nytimes.com/docs/congress_api/
 #   Face API: http://developers.face.com/
-# 
+#   http://developers.face.com/docs/api/faces-detect/
 # More programming help at:
 # http://ruby.bastardsbook.com
 #
