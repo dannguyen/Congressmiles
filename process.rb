@@ -19,8 +19,6 @@ require 'crack'  # to do easy parsing of JSON
 ## PREREQS: Images and meta-data stored in a folder called '200x250'
 IMAGES_DIR = '200x250'
 NYT_CONGRESS_JSON_NAME = 'nyt-congress.json'
-
-
 CROP_DIR = "crop"
 Dir.mkdir(CROP_DIR) unless File.exists?(CROP_DIR)
 
@@ -33,16 +31,16 @@ senators.each do |senator|
   
   
 ## Face.com's API returns an array of photos with an array of tags
-  face_fname = File.join(IMAGES_DIR, "#{senator['id']}.json")
+  f_fname = File.join(IMAGES_DIR, "#{senator['id']}.json")
 
   ## Since each JSON response we got has just one photo, we use index 0  
-  fjson = Crack::JSON.parse(File.open(face_fname).read)['photos'][0]
+  fjson = Crack::JSON.parse(File.open(f_fname).read)['photos'][0]
   
   ## But there may be more than one face tagged...so let's pick the most prominent
   f = fjson['tags'].sort_by{|t| t['attributes']['face']['confidence']}.reverse[0]  
 
   # adding to the senator hash for later reference...
-  senator['face_json'] = f 
+  senator['f_json'] = f 
   
   
   
@@ -61,30 +59,26 @@ senators.each do |senator|
   ## Face.com API returns the relative point (i.e. from 0-100) of a feature, 
   ## not exact pixels
 
-  ## assuming the face_width, face_height gets only the face and not all of the head
+  ## assuming the f_width, f_height gets only the face and not all of the head
   ## let's add a threshold on all sides (i.e. 5% and 15% to width and height respectively)...
-  ## but be careful that neither face_height, face_width are greater than 100.0:
+  ## but be careful that neither f_height, f_width are greater than 100.0:
     
-  face_center = f['center']
-  face_height = [f['height'] + 15.0, 100.0 ].min
-  face_width  = [f['width'] + 5.0, 100.0 ].min
+  f_center = f['center']
+  f_height = [f['height'] + 15.0, 100.0 ].min
+  f_width  = [f['width'] + 5.0, 100.0 ].min
   
-
+  face_width = w * f_width/100.0
+  face_height = face_width * 12/9.0 # 12/9 ratio
   
   img.crop!(
-    w * (face_center['x']-face_width/2)/100.0, 
-    h * (face_center['y']-face_height/2)/100.0, # y-coord of top-left corner
-    w * face_width/100.0,
-    h * face_height/100.0
+    w * (f_center['x']-f_width/2)/100.0, 
+    h * (f_center['y']-f_height/2)/100.0, # y-coord of top-left corner
+    face_width,
+    face_height
   )
-  
-  
-  
-  # my mind has blanked out on why I can't crop this to something like 90x120. Oh well
-  img = img.resize_to_fit(120) 
-  
+    
   cname = "#{CROP_DIR}/#{img_name}"
-  img.write(cname)
+  img.resize(90,120).write(cname)
   
   # add some convenience attributes
   senator['crop_image'] = cname
@@ -113,29 +107,31 @@ html_file.puts("<html><body>")
 
 
 ## Best smile
-# remember how we added to each senator hash a 'face_json' attribute?
+# remember how we added to each senator hash a 'f_json' attribute?
 
+## sorting by smile confidence and then 
+##  smile width (as a proportion of face width) as a tie breaker
 senators = senators.sort_by{ |s|     
     [ 
-      s['face_json']['attributes']['smiling']['confidence'], 
-      s['face_json']['mouth_right']['x'] - s['face_json']['mouth_left']['x'] 
+      s['f_json']['attributes']['smiling']['confidence'], 
+      (s['f_json']['mouth_right']['x'] - s['f_json']['mouth_left']['x']) / s['f_json']['width']
     ]
   }.reverse
   
 smiles =  senators.select{|s| 
-       s['face_json']['attributes']['smiling']['value']=='true'}  
+       s['f_json']['attributes']['smiling']['value']=='true'}  
   
 puts "#{smiles.length} senators had a smile"
   
 html_file.puts("<h2>10 Biggest Smiles</h2>")
 smiles[0..9].each do |senator|
-  html_file << foo_div_img(senator, senator['face_json']['attributes']['smiling']['confidence'])
+  html_file << foo_div_img(senator, senator['f_json']['attributes']['smiling']['confidence'])
 end
 
 
 html_file.puts("<h2>10 Most Ambiguous Smiles</h2>")
 smiles.reverse[0..9].each do |senator|
-  html_file << foo_div_img(senator, senator['face_json']['attributes']['smiling']['confidence'])
+  html_file << foo_div_img(senator, senator['f_json']['attributes']['smiling']['confidence'])
 end
 
 
@@ -145,7 +141,7 @@ html_file.puts("<h2>The Non-Smilers</h2>")
 
 non_smiles = (senators-smiles)
 non_smiles.each do |senator|
-  html_file << foo_div_img(senator,  senator['face_json']['attributes']['smiling']['confidence'])
+  html_file << foo_div_img(senator,  senator['f_json']['attributes']['smiling']['confidence'])
 end
 
 
@@ -162,7 +158,7 @@ html_file.puts("
   html_file.puts( "<tr>" + [party, 
       party_smilers.length, 
       non_smiles.select{|sen| sen['party']==party}.length,
-      party_smilers.inject(0){|sm, sen| sm += sen['face_json']['attributes']['smiling']['confidence']} / party_smilers.length
+      party_smilers.inject(0){|sm, sen| sm += sen['f_json']['attributes']['smiling']['confidence']} / party_smilers.length
     ].map{|v| "<td>#{v}</td>"}.join(' ') + "</tr>")
     
 end
@@ -174,14 +170,14 @@ html_file.puts("</tbody></table>")
 
 ## same strategy as before
 glasses = senators.select{|s| 
-    s['face_json']['attributes']['glasses']['value']=='true'}.sort_by{ |s|     
-      s['face_json']['attributes']['glasses']['confidence']
+    s['f_json']['attributes']['glasses']['value']=='true'}.sort_by{ |s|     
+      s['f_json']['attributes']['glasses']['confidence']
   }.reverse
   
 puts "#{glasses.length} senators wear glasses"
 html_file.puts("<h2>10 Most Bespectacled Senators</h2>")
 glasses[0..9].each do |senator|
-  html_file << foo_div_img(senator, senator['face_json']['attributes']['glasses']['confidence'])
+  html_file << foo_div_img(senator, senator['f_json']['attributes']['glasses']['confidence'])
 end
 
 
@@ -191,25 +187,25 @@ end
 ## One more rating: Face.com API's gender confidence
 
 # first sort by confidence, regardless of gender
-sens = senators.select{|s|  g = s['face_json']['attributes']['gender'] }.sort_by{|s| 
-    s['face_json']['attributes']['gender']['confidence']
+sens = senators.select{|s|  g = s['f_json']['attributes']['gender'] }.sort_by{|s| 
+    s['f_json']['attributes']['gender']['confidence']
   }.reverse
     
-males = sens.select{|s|  s['face_json']['attributes']['gender']['value']=='male'}
+males = sens.select{|s|  s['f_json']['attributes']['gender']['value']=='male'}
     
-females = sens.select{|s|  s['face_json']['attributes']['gender']['value']=='female'}
+females = sens.select{|s|  s['f_json']['attributes']['gender']['value']=='female'}
     
 puts "Face.com thinks there are #{males.length} men and #{females.length} women in the Senate"
 
 html_file.puts("<h2>10 Most Masculine-Featured Senators</h2>")
 males[0..9].each do |senator|
-  html_file << foo_div_img(senator, senator['face_json']['attributes']['gender']['confidence'])
+  html_file << foo_div_img(senator, senator['f_json']['attributes']['gender']['confidence'])
 end
 
 
 html_file.puts("<h2>10 Most Feminine-Featured Senators</h2>")
 females[0..9].each do |senator|
-  html_file << foo_div_img(senator,senator['face_json']['attributes']['gender']['confidence'])
+  html_file << foo_div_img(senator,senator['f_json']['attributes']['gender']['confidence'])
 end
     
 
